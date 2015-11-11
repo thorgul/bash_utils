@@ -25,7 +25,7 @@ get_resume_hash() {
 
 log_step() {
     echo "$(date '+%Y:%m:%d %H:%M:%S') - ${1}"  >> "${hashcat_logfile}"
-    echo "Resume Hash: " $(get_resume_hash "${1}") >> "${hashcat_logfile}"
+    echo "Resume Hash:" $(get_resume_hash "${1}") >> "${hashcat_logfile}"
 }
 
 cleanup() {
@@ -43,6 +43,7 @@ trap control_c SIGINT
 
 purge_hashfile() {
     if [ ! -f "${hashfile_purged}" ] || [ "${hashcat_pot_length}" != "$(wc -l ${hashcat_pot})" ]; then
+	hashcat_pot_length="$(wc -l ${hashcat_pot})"
 	tmp_date="./.tmp_hashcat_found_hashes_$(date '+%Y_%m_%d-%H_%M_%S')"
 	# [ -f "${hashcat_pot}" ] && grep -i -o -f "${hashfile}" "${hashcat_pot}" | sort -u > "${tmp_date}"
 	# [ -f "${tmp_date}" ]    && grep -i -f  "${tmp_date}" -v "${hashfile}" > "${hashfile_purged}"
@@ -103,13 +104,16 @@ crack_check "Straigt mode"					    && "${hashcat_bin}" -a 0 -m "${hashtype}" "${
 crack_check "Table lookup mode"					    && "${hashcat_bin}" -a 5 -m "${hashtype}" --table-file "${hashcat_rules_dir}/case_leet2.table" "${hashfile_purged}" $* "${dico_dir}"
 
 for mask in $(cat "${hashcat_masks_dir}/gsr.min8.2hours.netntlmv2.hcmask") ; do
-    crack_check "Mask mode (gsr.min8.2hours.netntlmv2.hcmask): ${mask}" && "${hashcat_bin}" -a 3 -m "${hashtype}" "${hashfile_purged}" "${mask}"
+    crack_check "Mask mode (gsr.min8.2hours.netntlmv2.hcmask): ${mask}" && \
+	"${hashcat_bin}" -a 3 -m "${hashtype}" "${hashfile_purged}" "${mask}"
 done
 
 # Rapid rules (kinda)
 for rule in best64.rule d3ad0ne.rule hsc_ascii.rules ; do
-    crack_check "Rule mode ${rule}" && \
-	"${hashcat_bin}" -a 0 -m "${hashtype}" -r           "${hashcat_rules_dir}/${rule}"      "${hashfile_purged}" $* "${dico_dir}"
+    for dico in $* "${dico_dir}" ; do
+	crack_check "Rule mode ${rule} (${dico})" && \
+	    "${hashcat_bin}" -a 0 -m "${hashtype}" -r "${hashcat_rules_dir}/${rule}" "${hashfile_purged}" "${dico}"
+    done
 done
 
 # Time eating rules
